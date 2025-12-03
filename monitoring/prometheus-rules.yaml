@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+  labels:
+    app: prometheus
+data:
+  alerts.yml: |
+    groups:
+      - name: macromind_alerts
+        interval: 30s
+        rules:
+          # Pod Crash Loops
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[5m]) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last 5 minutes"
+          
+          # High CPU Usage
+          - alert: HighCPUUsage
+            expr: (100 - (avg by(instance) (rate(container_cpu_usage_seconds_total{container!="POD",container!=""}[5m])) * 100)) < 10
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage on {{ $labels.instance }}"
+              description: "CPU usage is above 90% on {{ $labels.instance }} for more than 5 minutes"
+          
+          # High Memory Usage
+          - alert: HighMemoryUsage
+            expr: (container_memory_working_set_bytes{container!="POD",container!=""} / container_spec_memory_limit_bytes) * 100 > 90
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage on {{ $labels.pod }}"
+              description: "Memory usage is above 90% on pod {{ $labels.pod }} in namespace {{ $labels.namespace }}"
+          
+          # High API Error Rate
+          - alert: HighAPIErrorRate
+            expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) * 100 > 5
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High error rate on {{ $labels.service }}"
+              description: "Error rate is above 5% on {{ $labels.service }} for more than 5 minutes"
+          
+          # AI Service Down
+          - alert: AIServiceDown
+            expr: up{job="nutrition-ai-service"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Nutrition AI Service is down"
+              description: "Nutrition AI Service has been down for more than 2 minutes"
+          
+          # Auth Service Down
+          - alert: AuthServiceDown
+            expr: up{job="auth-service"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Auth Service is down"
+              description: "Auth Service has been down for more than 2 minutes"
+          
+          # Meal Planner Service Down
+          - alert: MealPlannerServiceDown
+            expr: up{job="meal-planner-service"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Meal Planner Service is down"
+              description: "Meal Planner Service has been down for more than 2 minutes"
+          
+          # Frontend Down
+          - alert: FrontendDown
+            expr: up{job="frontend"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Frontend is down"
+              description: "Frontend has been down for more than 2 minutes"
+          
+          # High Request Latency
+          - alert: HighRequestLatency
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High request latency on {{ $labels.service }}"
+              description: "95th percentile latency is above 1s on {{ $labels.service }} for more than 5 minutes"
+

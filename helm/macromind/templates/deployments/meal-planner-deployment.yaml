@@ -1,0 +1,77 @@
+{{- if .Values.mealPlannerService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meal-planner-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "macromind.labels" . | nindent 4 }}
+    app: meal-planner-service
+spec:
+  replicas: {{ .Values.mealPlannerService.replicas }}
+  selector:
+    matchLabels:
+      app: meal-planner-service
+  template:
+    metadata:
+      labels:
+        app: meal-planner-service
+    spec:
+      containers:
+      - name: meal-planner-service
+        image: {{ include "macromind.image" .Values.mealPlannerService.image }}
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        ports:
+        - containerPort: 8001
+          name: http
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: macromind-secrets
+              key: database-url
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: macromind-secrets
+              key: openai-api-key
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: macromind-secrets
+              key: jwt-secret-key
+        - name: JWT_ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: macromind-config
+              key: jwt-algorithm
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: macromind-config
+              key: cors-origins
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: macromind-config
+              key: environment
+        resources:
+          {{- toYaml .Values.mealPlannerService.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+{{- end }}
+

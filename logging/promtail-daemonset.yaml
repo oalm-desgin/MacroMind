@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail
+  namespace: monitoring
+  labels:
+    app: promtail
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promtail
+  labels:
+    app: promtail
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promtail
+  labels:
+    app: promtail
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promtail
+subjects:
+- kind: ServiceAccount
+  name: promtail
+  namespace: monitoring
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: monitoring
+  labels:
+    app: promtail
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+    spec:
+      serviceAccountName: promtail
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: promtail
+        image: grafana/promtail:2.9.2
+        imagePullPolicy: IfNotPresent
+        args:
+          - -config.file=/etc/promtail/promtail-config.yaml
+        ports:
+        - name: http
+          containerPort: 3101
+        volumeMounts:
+        - name: promtail-config
+          mountPath: /etc/promtail
+        - name: docker
+          mountPath: /var/lib/docker
+          readOnly: true
+        - name: pods
+          mountPath: /var/log/pods
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          privileged: true
+      volumes:
+      - name: promtail-config
+        configMap:
+          name: promtail-config
+      - name: docker
+        hostPath:
+          path: /var/lib/docker
+      - name: pods
+        hostPath:
+          path: /var/log/pods
+

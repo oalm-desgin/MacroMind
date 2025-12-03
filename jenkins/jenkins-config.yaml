@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-config
+  namespace: default
+  labels:
+    app: jenkins
+data:
+  # Jenkins configuration as code (JCasC) will be configured via UI
+  # This ConfigMap can be used for additional configuration
+  jenkins.yaml: |
+    jenkins:
+      systemMessage: "MacroMind CI/CD Pipeline"
+      numExecutors: 2
+      mode: NORMAL
+      scmCheckoutRetryCount: 3
+

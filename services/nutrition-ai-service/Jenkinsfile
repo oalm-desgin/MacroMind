@@ -1,0 +1,165 @@
+// MacroMind Nutrition AI Service CI/CD Pipeline
+
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'GIT_COMMIT', defaultValue: '', description: 'Git commit SHA')
+        string(name: 'GIT_COMMIT_SHORT', defaultValue: '', description: 'Short git commit SHA')
+        string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Git branch name')
+    }
+    
+    options {
+        timestamps()
+        timeout(time: 25, unit: 'MINUTES')  // Longer timeout for AI operations
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    environment {
+        SERVICE_NAME = 'nutrition-ai-service'
+        IMAGE_NAME = 'macromind/nutrition-ai-service'
+        K8S_NAMESPACE = 'macromind'
+        HELM_CHART_PATH = 'helm/macromind'
+        DOCKER_REGISTRY = credentials('docker-registry-url') ?: 'localhost:5000'
+        DOCKER_CREDENTIALS = credentials('docker-credentials')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    if (params.GIT_COMMIT) {
+                        sh "git checkout ${params.GIT_COMMIT}"
+                    }
+                    env.IMAGE_TAG = params.GIT_COMMIT_SHORT ?: sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    env.FULL_IMAGE = "${env.DOCKER_REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    env.LATEST_IMAGE = "${env.DOCKER_REGISTRY}/${env.IMAGE_NAME}:latest"
+                }
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                dir('services/nutrition-ai-service') {
+                    script {
+                        try {
+                            sh '''
+                                python3 -m venv venv
+                                source venv/bin/activate
+                                pip install -r requirements.txt
+                                pytest tests/ -v --tb=short
+                            '''
+                        } catch (Exception e) {
+                            echo "Tests failed: ${e}"
+                            currentBuild.result = 'FAILURE'
+                            throw e
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir('services/nutrition-ai-service') {
+                    script {
+                        docker.withRegistry("http://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS) {
+                            def image = docker.build("${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+                            image.push()
+                            image.push("latest")
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    try {
+                        sh """
+                            helm upgrade --install macromind ${env.HELM_CHART_PATH} \
+                                --namespace ${env.K8S_NAMESPACE} \
+                                --set nutritionAIService.image.repository=${env.IMAGE_NAME} \
+                                --set nutritionAIService.image.tag=${env.IMAGE_TAG} \
+                                --set imageRegistry=${env.DOCKER_REGISTRY} \
+                                --wait --timeout 5m
+                        """
+                    } catch (Exception e) {
+                        echo "Deployment failed: ${e}"
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
+                }
+            }
+        }
+        
+        stage('Smoke Test') {
+            steps {
+                script {
+                    def maxRetries = 5
+                    def retryCount = 0
+                    def success = false
+                    
+                    while (retryCount < maxRetries && !success) {
+                        try {
+                            sh """
+                                kubectl wait --for=condition=ready pod \
+                                    -l app=nutrition-ai-service \
+                                    -n ${env.K8S_NAMESPACE} \
+                                    --timeout=60s
+                                
+                                kubectl port-forward -n ${env.K8S_NAMESPACE} \
+                                    svc/nutrition-ai-service 8002:8002 &
+                                sleep 5
+                                
+                                curl -f http://localhost:8002/health || exit 1
+                                
+                                pkill -f 'kubectl port-forward'
+                            """
+                            success = true
+                            echo "Smoke test passed!"
+                        } catch (Exception e) {
+                            retryCount++
+                            if (retryCount < maxRetries) {
+                                echo "Smoke test failed, retrying (${retryCount}/${maxRetries})..."
+                                sleep 10
+                            } else {
+                                echo "Smoke test failed after ${maxRetries} attempts"
+                                currentBuild.result = 'FAILURE'
+                                throw e
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "✅ Nutrition AI Service deployed successfully!"
+            echo "Image: ${env.FULL_IMAGE}"
+        }
+        failure {
+            echo "❌ Nutrition AI Service deployment failed. Rolling back..."
+            script {
+                try {
+                    sh """
+                        helm rollback macromind -n ${env.K8S_NAMESPACE} || true
+                    """
+                } catch (Exception e) {
+                    echo "Rollback failed: ${e}"
+                }
+            }
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
+

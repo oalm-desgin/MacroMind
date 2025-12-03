@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: macromind-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "macromind.labels" . | nindent 4 }}
+data:
+  postgres-db: {{ .Values.config.postgresDb | quote }}
+  jwt-algorithm: {{ .Values.config.jwtAlgorithm | quote }}
+  jwt-access-token-expire-minutes: {{ .Values.config.jwtAccessTokenExpireMinutes | quote }}
+  jwt-refresh-token-expire-days: {{ .Values.config.jwtRefreshTokenExpireDays | quote }}
+  cors-origins: {{ .Values.config.corsOrigins | quote }}
+  environment: {{ .Values.config.environment | quote }}
+  auth-service-url: "http://auth-service:8000"
+  meal-planner-service-url: "http://meal-planner-service:8001"
+  nutrition-ai-service-url: "http://nutrition-ai-service:8002"
+

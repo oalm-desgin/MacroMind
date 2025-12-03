@@ -1,0 +1,66 @@
+# MacroMind Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT COMMIT terraform.tfvars to Git (contains sensitive data)
+
+# AWS Configuration
+aws_region   = "us-east-1"
+environment  = "production"  # dev, staging, or production
+project_name = "macromind"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# Subnet Configuration
+# Leave empty to use all available zones
+availability_zones = []
+
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+
+# EKS Configuration
+eks_cluster_version = "1.28"
+eks_cluster_name    = "macromind-cluster"
+
+# Enable EKS control plane logging
+enable_cluster_logging = true
+cluster_log_types      = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
+# Node Group Configuration
+node_group_instance_types = ["t3.medium", "t3.large"]
+node_group_desired_size   = 2
+node_group_min_size       = 1
+node_group_max_size       = 5
+node_group_disk_size      = 50
+node_group_capacity_type  = "ON_DEMAND"  # ON_DEMAND or SPOT
+
+# Spot Instances (for cost optimization)
+enable_spot_instances = false
+spot_instance_types   = ["t3.medium", "t3.large", "t3a.medium", "t3a.large"]
+
+# Networking
+enable_nat_gateway  = true
+single_nat_gateway  = false  # Set to true for dev to save costs
+
+# Security
+# Restrict in production to your IP ranges
+allowed_cidr_blocks = ["0.0.0.0/0"]
+
+# SSH Access (optional)
+enable_ssh_access = false
+ssh_key_name      = ""  # Your EC2 Key Pair name
+
+# Jenkins Configuration
+jenkins_node_port     = 30080
+enable_jenkins_ingress = false
+
+# Cluster Autoscaler
+enable_cluster_autoscaler = true
+cluster_autoscaler_version = "v1.28.0"
+
+# Additional Tags
+additional_tags = {
+  Team        = "DevOps"
+  CostCenter  = "Engineering"
+  Application = "MacroMind"
+}
+

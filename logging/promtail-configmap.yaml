@@ -1,0 +1,178 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: monitoring
+  labels:
+    app: promtail
+data:
+  promtail-config.yaml: |
+    server:
+      http_listen_port: 3101
+      grpc_listen_port: 9095
+    
+    positions:
+      filename: /tmp/positions.yaml
+    
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    
+    scrape_configs:
+      # Kubernetes Pods - MacroMind Services
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - macromind
+        pipeline_stages:
+          - docker: {}
+        relabel_configs:
+          # Only scrape pods with promtail annotation
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          # Get pod name
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          # Get namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          # Get container name
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          # Get app label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          # Set log path
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+          # Set hostname
+          - target_label: __host__
+            replacement: ${HOSTNAME}
+      
+      # Auth Service Logs
+      - job_name: auth-service
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - macromind
+        pipeline_stages:
+          - docker: {}
+          - json:
+              expressions:
+                level: level
+                message: message
+                timestamp: timestamp
+          - labels:
+              level:
+              app: auth-service
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: auth-service
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+      
+      # Meal Planner Service Logs
+      - job_name: meal-planner-service
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - macromind
+        pipeline_stages:
+          - docker: {}
+          - json:
+              expressions:
+                level: level
+                message: message
+                timestamp: timestamp
+          - labels:
+              level:
+              app: meal-planner-service
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: meal-planner-service
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+      
+      # Nutrition AI Service Logs
+      - job_name: nutrition-ai-service
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - macromind
+        pipeline_stages:
+          - docker: {}
+          - json:
+              expressions:
+                level: level
+                message: message
+                timestamp: timestamp
+          - labels:
+              level:
+              app: nutrition-ai-service
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: nutrition-ai-service
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+      
+      # Frontend Logs
+      - job_name: frontend
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - macromind
+        pipeline_stages:
+          - docker: {}
+          - json:
+              expressions:
+                level: level
+                message: message
+                timestamp: timestamp
+          - labels:
+              level:
+              app: frontend
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: frontend
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            replacement: /var/log/pods/*$1/*.log
+

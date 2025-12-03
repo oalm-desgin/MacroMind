@@ -1,0 +1,42 @@
+# Development values for MacroMind
+# Use with: helm install macromind ./helm/macromind -f helm/macromind/values-dev.yaml
+
+global:
+  environment: development
+
+# Reduce replicas for development
+authService:
+  replicas: 1
+  autoscaling:
+    enabled: false
+
+mealPlannerService:
+  replicas: 1
+  autoscaling:
+    enabled: false
+
+nutritionAIService:
+  replicas: 1
+
+frontend:
+  replicas: 1
+
+# Development ingress
+ingress:
+  hosts:
+    - host: macromind.local
+      paths:
+        - path: /
+          pathType: Prefix
+        - path: /api/auth
+          pathType: Prefix
+        - path: /api/meals
+          pathType: Prefix
+        - path: /api/ai
+          pathType: Prefix
+
+# Development config
+config:
+  environment: "development"
+  corsOrigins: "http://localhost,http://localhost:3000,http://localhost:5173,http://macromind.local"
+

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: macromind
+  labels:
+    name: macromind
+    app: macromind
+    environment: production
+

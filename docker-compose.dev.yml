@@ -1,0 +1,55 @@
+# Docker Compose for Development
+# Use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# This overrides production settings with development-friendly configurations
+
+version: '3.8'
+
+services:
+  # Auth Service - Development overrides
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/auth-service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      ENVIRONMENT: development
+
+  # Meal Planner Service - Development overrides
+  meal-planner-service:
+    build:
+      context: ./services/meal-planner-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/meal-planner-service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    environment:
+      ENVIRONMENT: development
+
+  # Nutrition AI Service - Development overrides
+  nutrition-ai-service:
+    build:
+      context: ./services/nutrition-ai-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/nutrition-ai-service:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+    environment:
+      ENVIRONMENT: development
+
+  # Frontend - Development overrides
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    environment:
+      # For local dev, use localhost backend
+      VITE_API_BASE_URL: http://localhost:8000
+

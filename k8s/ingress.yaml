@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: macromind-ingress
+  namespace: macromind
+  labels:
+    app: macromind
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: macromind.local
+    http:
+      paths:
+      # Frontend - root path
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+      # Auth Service API
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 8000
+      # Meal Planner Service API
+      - path: /api/meals
+        pathType: Prefix
+        backend:
+          service:
+            name: meal-planner-service
+            port:
+              number: 8001
+      # Nutrition AI Service API
+      - path: /api/ai
+        pathType: Prefix
+        backend:
+          service:
+            name: nutrition-ai-service
+            port:
+              number: 8002
+

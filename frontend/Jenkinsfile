@@ -1,0 +1,173 @@
+// MacroMind Frontend CI/CD Pipeline
+
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'GIT_COMMIT', defaultValue: '', description: 'Git commit SHA')
+        string(name: 'GIT_COMMIT_SHORT', defaultValue: '', description: 'Short git commit SHA')
+        string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Git branch name')
+    }
+    
+    options {
+        timestamps()
+        timeout(time: 20, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    environment {
+        SERVICE_NAME = 'frontend'
+        IMAGE_NAME = 'macromind/frontend'
+        K8S_NAMESPACE = 'macromind'
+        HELM_CHART_PATH = 'helm/macromind'
+        DOCKER_REGISTRY = credentials('docker-registry-url') ?: 'localhost:5000'
+        DOCKER_CREDENTIALS = credentials('docker-credentials')
+        NODE_VERSION = '18'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    if (params.GIT_COMMIT) {
+                        sh "git checkout ${params.GIT_COMMIT}"
+                    }
+                    env.IMAGE_TAG = params.GIT_COMMIT_SHORT ?: sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    env.FULL_IMAGE = "${env.DOCKER_REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                    env.LATEST_IMAGE = "${env.DOCKER_REGISTRY}/${env.IMAGE_NAME}:latest"
+                }
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                        npm ci
+                    '''
+                }
+            }
+        }
+        
+        stage('Lint & Test') {
+            steps {
+                dir('frontend') {
+                    script {
+                        try {
+                            sh '''
+                                npm run lint || true
+                                # npm test || true  # Uncomment when tests are added
+                            '''
+                        } catch (Exception e) {
+                            echo "Lint/Test warnings: ${e}"
+                            // Don't fail build on lint warnings
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir('frontend') {
+                    script {
+                        docker.withRegistry("http://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS) {
+                            def image = docker.build("${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+                            image.push()
+                            image.push("latest")
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    try {
+                        sh """
+                            helm upgrade --install macromind ${env.HELM_CHART_PATH} \
+                                --namespace ${env.K8S_NAMESPACE} \
+                                --set frontend.image.repository=${env.IMAGE_NAME} \
+                                --set frontend.image.tag=${env.IMAGE_TAG} \
+                                --set imageRegistry=${env.DOCKER_REGISTRY} \
+                                --wait --timeout 5m
+                        """
+                    } catch (Exception e) {
+                        echo "Deployment failed: ${e}"
+                        currentBuild.result = 'FAILURE'
+                        throw e
+                    }
+                }
+            }
+        }
+        
+        stage('Smoke Test') {
+            steps {
+                script {
+                    def maxRetries = 5
+                    def retryCount = 0
+                    def success = false
+                    
+                    while (retryCount < maxRetries && !success) {
+                        try {
+                            sh """
+                                kubectl wait --for=condition=ready pod \
+                                    -l app=frontend \
+                                    -n ${env.K8S_NAMESPACE} \
+                                    --timeout=60s
+                                
+                                kubectl port-forward -n ${env.K8S_NAMESPACE} \
+                                    svc/frontend 80:80 &
+                                sleep 5
+                                
+                                curl -f http://localhost/ || exit 1
+                                
+                                pkill -f 'kubectl port-forward'
+                            """
+                            success = true
+                            echo "Smoke test passed!"
+                        } catch (Exception e) {
+                            retryCount++
+                            if (retryCount < maxRetries) {
+                                echo "Smoke test failed, retrying (${retryCount}/${maxRetries})..."
+                                sleep 10
+                            } else {
+                                echo "Smoke test failed after ${maxRetries} attempts"
+                                currentBuild.result = 'FAILURE'
+                                throw e
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "✅ Frontend deployed successfully!"
+            echo "Image: ${env.FULL_IMAGE}"
+        }
+        failure {
+            echo "❌ Frontend deployment failed. Rolling back..."
+            script {
+                try {
+                    sh """
+                        helm rollback macromind -n ${env.K8S_NAMESPACE} || true
+                    """
+                } catch (Exception e) {
+                    echo "Rollback failed: ${e}"
+                }
+            }
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
+

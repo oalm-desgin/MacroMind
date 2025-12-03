@@ -1,0 +1,32 @@
+# Node / Frontend
+node_modules
+dist
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+
+# Vite cache
+node_modules/.vite
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Python / Backend
+venv
+__pycache__/
+*.pyc
+*.pyo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+build/
