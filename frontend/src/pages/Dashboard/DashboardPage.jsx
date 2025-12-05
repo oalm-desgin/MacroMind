@@ -46,15 +46,16 @@ const DashboardPage = () => {
     }
   }
 
-  const handleGenerateWeeklyPlan = () => {
+  const handleGenerateWeeklyPlan = async () => {
     if (isGuest) {
       console.log('[NAV] Redirect → /auth')
       navigate('/auth')
       return
     }
 
-    console.log('[NAV] Redirect → /meal-planner')
-    navigate('/meal-planner', { state: { autoGenerate: true } })
+    // Navigate to meal planner and immediately trigger generation
+    console.log('[NAV] Redirect → /meal-planner (startWizard)')
+    navigate('/meal-planner', { state: { startWizard: true } })
   }
 
   const handleUpdateGoal = () => {
@@ -146,17 +147,21 @@ const DashboardPage = () => {
               </div>
               
               {/* Today's Meal Plan - spans 2 columns */}
-              <div className="md:col-span-2 lg:col-span-2 bg-slate-900/40 backdrop-blur-lg border border-white/10 rounded-3xl p-6 shadow-xl hover:bg-slate-900/50 transition-all">
+              <div className="md:col-span-2 lg:col-span-2 bg-slate-900/40 backdrop-blur-lg border border-white/10 rounded-3xl p-6 shadow-xl hover:bg-slate-900/50 transition-all min-h-[500px] flex flex-col">
                 <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-pink-200 mb-4">Today's Meal Plan</h2>
                 {loading ? (
                   <LoadingSpinner />
                 ) : error ? (
                   <ErrorMessage message={error} onRetry={fetchTodaysMeals} />
                 ) : todaysMeals ? (
-                  <MacroSummary todaysMeals={todaysMeals} />
+                  <div className="flex-1">
+                    <MacroSummary todaysMeals={todaysMeals} />
+                  </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-300">
-                    No meal plan yet. Generate one to get started!
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center py-8 text-gray-300">
+                      No meal plan yet. Generate one to get started!
+                    </div>
                   </div>
                 )}
               </div>
@@ -180,8 +185,8 @@ const DashboardPage = () => {
             </>
           )}
 
-          {/* Today's Meals - spans 1 column, always visible */}
-          <div className="md:col-span-1 lg:col-span-1 bg-slate-900/40 backdrop-blur-lg border border-white/10 rounded-3xl p-6 shadow-xl hover:bg-slate-900/50 transition-all">
+          {/* Today's Meals - spans 2 columns, always visible */}
+          <div className="md:col-span-2 lg:col-span-2 bg-slate-900/40 backdrop-blur-lg border border-white/10 rounded-3xl p-6 shadow-xl hover:bg-slate-900/50 transition-all min-h-[500px] flex flex-col">
             <TodaysMeals
               meals={todaysMeals?.meals || []}
               date={todaysMeals?.date}

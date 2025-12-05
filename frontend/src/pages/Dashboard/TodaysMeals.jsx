@@ -1,33 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Utensils, Sun, CloudSun, Moon, RefreshCw, Lock } from 'lucide-react'
-import mealPlannerService from '../../services/mealPlannerService'
-import { useAuth } from '../../hooks/useAuth'
+import { Utensils, Sun, CloudSun, Moon } from 'lucide-react'
 
 const TodaysMeals = ({ meals, date, onMealUpdated }) => {
-  const navigate = useNavigate()
-  const { isGuest } = useAuth()
-  const [swappingMealId, setSwappingMealId] = useState(null)
-
-  const handleSwapMeal = async (mealId) => {
-    if (isGuest) {
-      return // Guest mode - do nothing
-    }
-
-    try {
-      setSwappingMealId(mealId)
-      await mealPlannerService.swapMeal(mealId)
-      // Refresh meals after swap
-      if (onMealUpdated) {
-        await onMealUpdated()
-      }
-    } catch (error) {
-      console.error('Error swapping meal:', error)
-      alert('Failed to swap meal. Please try again.')
-    } finally {
-      setSwappingMealId(null)
-    }
-  }
   const getMealIcon = (mealType) => {
     switch (mealType) {
       case 'breakfast':
@@ -55,7 +28,7 @@ const TodaysMeals = ({ meals, date, onMealUpdated }) => {
   }
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-pink-200 mb-2">Today's Meals</h2>
       <p className="text-gray-400 text-sm mb-6">
         {date ? new Date(date).toLocaleDateString('en-US', { 
@@ -65,7 +38,7 @@ const TodaysMeals = ({ meals, date, onMealUpdated }) => {
         }) : 'Today'}
       </p>
 
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar-dark">
         {meals && meals.length > 0 ? (
           meals.map((meal, index) => {
             const Icon = getMealIcon(meal.meal_type)
@@ -94,12 +67,12 @@ const TodaysMeals = ({ meals, date, onMealUpdated }) => {
                       </span>
                     </div>
 
-                    <p className="text-sm text-gray-200 mb-3 font-medium">
+                    <p className="text-sm text-gray-200 mb-3 font-medium break-words">
                       {meal.name}
                     </p>
 
                     {/* Macros */}
-                    <div className="flex items-center gap-4 text-xs mb-3">
+                    <div className="flex items-center gap-4 text-xs">
                       <div className="flex items-center gap-1">
                         <span className="text-gray-400">Protein:</span>
                         <span className="text-white font-semibold">{meal.protein}g</span>
@@ -113,36 +86,6 @@ const TodaysMeals = ({ meals, date, onMealUpdated }) => {
                         <span className="text-white font-semibold">{meal.fats}g</span>
                       </div>
                     </div>
-
-                    {/* Swap Button */}
-                    <button
-                      onClick={() => handleSwapMeal(meal.id)}
-                      disabled={isGuest || swappingMealId === meal.id}
-                      className={`w-full mt-2 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
-                        isGuest
-                          ? 'bg-slate-700/50 text-gray-500 cursor-not-allowed'
-                          : swappingMealId === meal.id
-                          ? 'bg-purple-500/30 text-purple-300 cursor-wait'
-                          : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-md hover:shadow-purple-500/30 active:scale-95'
-                      }`}
-                    >
-                      {isGuest ? (
-                        <span className="flex items-center justify-center gap-1">
-                          <Lock size={12} />
-                          Register to Swap
-                        </span>
-                      ) : swappingMealId === meal.id ? (
-                        <span className="flex items-center justify-center gap-1">
-                          <RefreshCw size={12} className="animate-spin" />
-                          Regenerating...
-                        </span>
-                      ) : (
-                        <span className="flex items-center justify-center gap-1">
-                          <RefreshCw size={12} />
-                          Swap Meal
-                        </span>
-                      )}
-                    </button>
                   </div>
                 </div>
               </div>

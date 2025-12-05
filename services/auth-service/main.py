@@ -10,8 +10,31 @@ from typing import Optional
 import os
 import time
 from dotenv import load_dotenv
+from pathlib import Path
 import uuid
 import json
+
+# Get the directory where THIS file is located
+current_dir = Path(__file__).parent
+env_path = current_dir / ".env"
+
+# Force load with override=True
+load_dotenv(dotenv_path=env_path, override=True)
+
+# Debug: Read the .env file directly and print its contents
+if env_path.exists():
+    print(f"DEBUG [auth-service]: Reading .env file directly from {env_path}")
+    with open(env_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+        print("DEBUG [auth-service]: .env file contents:")
+        # Print first 50 chars of each line (to hide full values)
+        for line in content.split('\n'):
+            if line.strip() and not line.startswith('#'):
+                if '=' in line:
+                    key = line.split('=')[0].strip()
+                    print(f"  {key}=...")
+                else:
+                    print(f"  (malformed line: {line[:50]})")
 
 # Import local modules
 from database import get_db, init_db, check_db_connection
@@ -39,8 +62,6 @@ from auth import (
     get_user_from_token,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
-
-load_dotenv()
 
 # Validate required environment variables on startup
 # We removed "DATABASE_URL" from this list so it doesn't crash if the .env is missing

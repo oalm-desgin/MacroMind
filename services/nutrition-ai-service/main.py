@@ -12,13 +12,33 @@ from typing import Optional, Dict, Any
 import os
 import time
 from dotenv import load_dotenv
+from pathlib import Path
 import uuid
 from jose import jwt, JWTError
 import httpx
 
+# Debugging: Print current working directory and files
+print(f"DEBUG: Current working directory: {os.getcwd()}")
+print(f"DEBUG: Files in current folder: {os.listdir('.')}")
+
+# Force Load .env: Use pathlib to find the .env file right next to main.py
+env_path = Path(__file__).parent / '.env'
+print(f"DEBUG: Loading .env from: {env_path}")
+print(f"DEBUG: .env file exists: {env_path.exists()}")
+if env_path.exists():
+    print(f"DEBUG: .env file absolute path: {env_path.absolute()}")
+load_dotenv(dotenv_path=env_path)
+
+# Debug: Check if GEMINI_API_KEY was loaded
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    print(f"DEBUG: GEMINI_API_KEY loaded (length: {len(gemini_key)})")
+else:
+    print("DEBUG: GEMINI_API_KEY not found in environment")
+
 # Import local modules
 from database import get_db, init_db, check_db_connection
-from models import ChatMessage
+from models import ChatMessage, MealPlan
 from schemas import (
     ChatRequest,
     ChatResponse,
@@ -28,12 +48,13 @@ from schemas import (
     ChatHistoryItem,
     MessageResponse,
     ErrorResponse,
-    IngredientMacros
+    IngredientMacros,
+    MealPlanRequest,
+    WeeklyPlan
 )
 from ai_coach import chat_with_nutrition_coach, validate_ai_response_length
 from macro_analyzer import analyze_recipe_macros
-
-load_dotenv()
+from meal_planner import generate_weekly_plan
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -52,7 +73,22 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS Configuration
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174").split(",")
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
+    "http://localhost:5177",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "http://127.0.0.1:5176",
+    "http://127.0.0.1:5177",
+]
+
+# Allow environment variable override, but default to the comprehensive list above
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", ",".join(origins)).split(",")
 # Clean up origins (remove whitespace)
 CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS]
 
@@ -132,11 +168,11 @@ async def startup_event():
                 print("ERROR: Could not connect to database after all attempts")
                 print("Service will start but database operations will fail")
     
-    # Check OpenAI configuration
-    if os.getenv("OPENAI_API_KEY"):
-        print("OpenAI API key configured")
+    # Check Gemini configuration
+    if os.getenv("GEMINI_API_KEY"):
+        print("Gemini API key configured")
     else:
-        print("WARNING: OpenAI API key not configured - will use fallback responses")
+        print("WARNING: GEMINI_API_KEY not set - using default key or fallback responses")
 
 
 # Health check endpoint
@@ -149,13 +185,13 @@ async def health_check():
     try:
         # Quick database connectivity check (non-blocking)
         db_status = check_db_connection(max_retries=1, retry_delay=1)
-        openai_configured = os.getenv("OPENAI_API_KEY") is not None
+        gemini_configured = os.getenv("GEMINI_API_KEY") is not None
         
         return {
             "status": "ok",
             "service": "nutrition-ai-service",
             "database": "connected" if db_status else "disconnected",
-            "openai": "configured" if openai_configured else "not_configured"
+            "gemini": "configured" if gemini_configured else "not_configured"
         }
     except Exception as e:
         # Even if database check fails, return 200 OK
@@ -164,7 +200,7 @@ async def health_check():
             "status": "ok",
             "service": "nutrition-ai-service",
             "database": "disconnected",
-            "openai": "configured" if os.getenv("OPENAI_API_KEY") else "not_configured",
+            "gemini": "configured" if os.getenv("GEMINI_API_KEY") else "not_configured",
             "error": str(e)
         }
 
@@ -304,15 +340,15 @@ async def chat_with_ai_coach(
         )
     
     except RuntimeError as e:
-        # Handle OpenAI API key errors specifically
+        # Handle Gemini API key errors specifically
         db.rollback()
         error_message = str(e)
         print(f"RuntimeError in chat endpoint: {error_message}")
         
-        if "API key" in error_message or "OPENAI_API_KEY" in error_message:
+        if "API key" in error_message or "GEMINI_API_KEY" in error_message or "api_key" in error_message.lower():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="OpenAI API key is not configured or invalid. Please check your OPENAI_API_KEY environment variable."
+                detail="Gemini API key is not configured or invalid. Please check your GEMINI_API_KEY environment variable."
             )
         else:
             raise HTTPException(
@@ -486,6 +522,170 @@ async def analyze_recipe(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to analyze recipe: {str(e)}"
+        )
+
+
+# Meal Plan Generation endpoint
+@app.post(
+    "/api/ai/generate-plan",
+    response_model=WeeklyPlan,
+    tags=["Meal Planner"],
+    responses={
+        200: {"description": "Meal plan generated successfully"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
+        503: {"model": ErrorResponse, "description": "AI service unavailable"}
+    }
+)
+@limiter.limit("5/minute")
+async def generate_meal_plan(
+    request: Request,
+    meal_plan_request: MealPlanRequest,
+    user_id: str = Depends(get_user_id_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate a personalized weekly meal plan using AI.
+    
+    - Creates a 7-day meal plan (Monday through Sunday)
+    - Each day includes: breakfast, lunch, dinner, and snack
+    - Personalized based on user's calories, goals, and preferences
+    - Excludes specified foods
+    - Rate limited to 5 requests per minute
+    - Uses Gemini AI for meal plan generation
+    
+    Request body:
+    - excluded_foods: Optional list of foods to exclude (e.g., ["mushrooms", "shrimp"])
+    """
+    try:
+        print(f"Meal plan generation request from user {user_id}")
+        print(f"Excluded foods: {meal_plan_request.excluded_foods}")
+        
+        # Fetch user profile from auth-service for personalized context
+        authorization = request.headers.get("Authorization", "")
+        user_profile = None
+        if authorization:
+            try:
+                user_profile = await get_user_profile_from_auth_service(user_id, authorization.replace("Bearer ", ""))
+                if user_profile:
+                    print(f"User profile loaded: daily_calories={user_profile.get('daily_calories')}, fitness_goal={user_profile.get('fitness_goal')}")
+            except Exception as e:
+                print(f"Could not fetch user profile (continuing without it): {e}")
+        
+        # Generate meal plan with AI
+        import asyncio
+        import json
+        loop = asyncio.get_event_loop()
+        meal_plan_data = await loop.run_in_executor(
+            None,
+            generate_weekly_plan,
+            user_profile,
+            meal_plan_request.excluded_foods or []
+        )
+        
+        # Save meal plan to database
+        try:
+            # First, check if user already has a meal plan and update it, or create new one
+            existing_plan = db.query(MealPlan).filter(
+                MealPlan.user_id == uuid.UUID(user_id)
+            ).first()
+            
+            if existing_plan:
+                # Update existing plan
+                existing_plan.plan_data = meal_plan_data
+                db.commit()
+                db.refresh(existing_plan)
+                print(f"Updated meal plan for user {user_id}")
+            else:
+                # Create new plan
+                new_plan = MealPlan(
+                    id=uuid.uuid4(),
+                    user_id=uuid.UUID(user_id),
+                    plan_data=meal_plan_data
+                )
+                db.add(new_plan)
+                db.commit()
+                db.refresh(new_plan)
+                print(f"Created new meal plan for user {user_id}")
+        except Exception as db_error:
+            # Log database error but don't fail the request - plan was generated successfully
+            db.rollback()
+            print(f"Warning: Failed to save meal plan to database: {db_error}")
+            print("Meal plan was generated but not persisted. User can still use it.")
+        
+        # Validate and return the meal plan
+        return WeeklyPlan(**meal_plan_data)
+    
+    except RuntimeError as e:
+        error_message = str(e)
+        print(f"RuntimeError in meal plan generation: {error_message}")
+        
+        if "API key" in error_message or "GEMINI_API_KEY" in error_message or "api_key" in error_message.lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Gemini API key is not configured or invalid. Please check your GEMINI_API_KEY environment variable."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"AI service unavailable: {error_message}"
+            )
+    except Exception as e:
+        error_type = type(e).__name__
+        error_message = str(e)
+        print(f"Error in meal plan generation ({error_type}): {error_message}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate meal plan: {error_message}"
+        )
+
+
+# Get current meal plan endpoint
+@app.get(
+    "/api/ai/meal-plan",
+    response_model=WeeklyPlan,
+    tags=["Meal Planner"],
+    responses={
+        200: {"description": "Meal plan retrieved successfully"},
+        404: {"model": ErrorResponse, "description": "No meal plan found"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"}
+    }
+)
+async def get_meal_plan(
+    user_id: str = Depends(get_user_id_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the user's current saved meal plan.
+    
+    - Returns the most recent weekly meal plan
+    - Returns 404 if no plan exists (so frontend knows to show 'Generate' button)
+    - Used by Dashboard to display today's meals
+    """
+    try:
+        # Query for user's meal plan
+        meal_plan = db.query(MealPlan).filter(
+            MealPlan.user_id == uuid.UUID(user_id)
+        ).order_by(MealPlan.updated_at.desc()).first()
+        
+        if not meal_plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No meal plan found. Please generate a meal plan first."
+            )
+        
+        # Return the plan data
+        return WeeklyPlan(**meal_plan.plan_data)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_type = type(e).__name__
+        error_message = str(e)
+        print(f"Error retrieving meal plan ({error_type}): {error_message}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve meal plan: {error_message}"
         )
 
 

@@ -56,23 +56,23 @@ const MacroSummary = ({ todaysMeals }) => {
   ]
 
   return (
-    <div className="card">
-      <h2 className="text-xl font-bold text-slate-900 mb-6">Today's Macros</h2>
+    <div className="h-full flex flex-col">
+      <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-pink-200 mb-6">Today's Macros</h2>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 flex-1 content-start">
         {macros.map((macro) => {
           const Icon = macro.icon
           return (
             <div
               key={macro.name}
-              className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:scale-[1.02] hover:shadow-lg transition-all duration-300 group"
+              className="p-5 rounded-xl bg-slate-800/50 backdrop-blur-md border border-white/10 hover:border-purple-500/30 hover:scale-[1.02] hover:shadow-lg transition-all duration-300 group"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-lg ${macro.iconBg} group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className={macro.iconColor} size={20} />
+                  <div className={`p-2.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="text-purple-300" size={20} />
                   </div>
-                  <span className="text-slate-600 text-sm font-medium">
+                  <span className="text-white text-sm font-medium">
                     {macro.name}
                   </span>
                 </div>
@@ -80,23 +80,23 @@ const MacroSummary = ({ todaysMeals }) => {
 
               <div className="space-y-2">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-slate-900">
+                  <span className="text-2xl font-bold text-white">
                     {Math.round(macro.value)}
                   </span>
-                  <span className="text-sm text-slate-500">
+                  <span className="text-sm text-slate-400">
                     / {macro.target} {macro.unit}
                   </span>
                 </div>
 
                 {/* Progress Bar with Gradient */}
-                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-slate-700/50 rounded-full h-2.5 overflow-hidden">
                   <div
                     className={`h-2.5 rounded-full bg-gradient-to-r ${macro.progressGradient} transition-all duration-500`}
                     style={{ width: `${Math.min(macro.percentage, 100)}%` }}
                   />
                 </div>
 
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-400">
                   {Math.round(macro.percentage)}% of target
                 </p>
               </div>

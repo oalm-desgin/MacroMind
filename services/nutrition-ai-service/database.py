@@ -7,15 +7,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 import os
 import time
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# Get database URL from environment
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://macromind:password@macromind_postgres:5432/macromind"  # Use container name for Docker
-)
+# Database URL - hardcoded for local development
+DATABASE_URL = "postgresql://postgres:123@localhost:5432/macromind"
 
 # Log connection string (mask password for security)
 if DATABASE_URL:
@@ -74,7 +67,7 @@ def init_db():
     Initialize database tables.
     Creates all tables defined in models.
     """
-    from models import ChatMessage  # Import here to avoid circular imports
+    from models import ChatMessage, MealPlan  # Import here to avoid circular imports
     Base.metadata.create_all(bind=engine)
 
 
