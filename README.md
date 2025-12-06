@@ -1,102 +1,128 @@
-# MacroMind
+# 🧬 MacroMind
 
-An AI-powered nutrition and meal planning platform built with microservices architecture.
+> **AI-Powered Nutrition & Fitness Command Center**
+> A full-stack, intelligent application providing personalized meal planning and real-time coaching using Google Gemini 2.0.
 
-## Architecture Overview
+![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-61DAFB?style=for-the-badge&logo=react)
+![Tailwind](https://img.shields.io/badge/UI-Tailwind%20CSS%20%7C%20Framer-38B2AC?style=for-the-badge&logo=tailwind-css)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)
+![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql)
+![Gemini](https://img.shields.io/badge/AI-Google%20Gemini%202.0-8E75B2?style=for-the-badge)
 
-**Frontend:** React + TailwindCSS + Vite  
-**Backend:** Python/FastAPI microservices  
-**Database:** PostgreSQL  
-**AI:** OpenAI API  
-**DevOps:** Docker + Kubernetes + Helm + Jenkins
+## 📖 Overview
 
-## Project Structure
+**MacroMind** is an advanced nutrition platform designed to solve the complexity of dietary tracking. Unlike standard calorie counters, MacroMind utilizes Generative AI to create hyper-personalized, nutritionally balanced meal plans instantly.
 
-```
+The application demonstrates a modern **Microservices Architecture** and features a high-fidelity **Glassmorphism UI** with 3D elements, bridging the gap between functional utility and premium user experience.
+
+## ✨ Key Technical Features
+
+### 🎨 **Immersive User Experience**
+* **3D Dynamic Backgrounds:** Integrated React Three Fiber for performant, GPU-accelerated mesh gradient backgrounds.
+* **Interactive Onboarding:** A step-by-step wizard to capture user biometrics and goals, utilizing Framer Motion for smooth state transitions.
+* **Modern UI Architecture:** Component-driven design using Tailwind CSS with a consistent "Dark Glass" aesthetic.
+
+### 🧠 **AI-Powered Intelligence**
+* **Generative Meal Planner:** Integrates **Google Gemini 2.0 Flash** to generate 7-day meal plans in real-time.
+    * Automatically calculates macros (Protein, Carbs, Fats) for every meal.
+    * Adheres to strict dietary constraints (Keto, Vegan, Gluten-Free).
+    * **Smart Exclusion Engine:** Allows users to filter out specific disliked ingredients dynamically.
+* **Context-Aware AI Coach:** A persistent chat interface that retains user context (goals, weight, history) to provide tailored advice.
+
+### ⚙️ **System Architecture**
+* **Microservices Backend:** Decoupled services for better scalability and maintenance:
+    * **Auth Service (Port 8000):** Manages Identity, JWT issuance, and User Profiles.
+    * **Nutrition Service (Port 8001):** Manages LLM integration, prompt engineering, and heavy logic.
+* **Security:** Implements industry-standard JWT (JSON Web Tokens) for stateless authentication and `bcrypt` for password hashing.
+* **Persistence:** Leverages PostgreSQL for relational data storage, ensuring data integrity for user profiles and history.
+
+---
+
+## 🛠 Technology Stack
+
+### **Frontend**
+* **Core:** React 18, Vite
+* **Styling:** Tailwind CSS, clsx
+* **Motion:** Framer Motion
+* **3D Rendering:** React Three Fiber (Three.js)
+* **State:** React Context API
+
+### **Backend**
+* **Framework:** FastAPI (Python 3.10+)
+* **Server:** Uvicorn (ASGI)
+* **Database ORM:** SQLAlchemy
+* **Validation:** Pydantic
+* **AI SDK:** Google Generative AI (`google-generativeai`)
+
+### **Infrastructure**
+* **Database:** PostgreSQL 16
+* **Version Control:** Git
+
+---
+
+## 📂 Project Structure
+
+```bash
 MacroMind/
-├── frontend/                    # React frontend application
-├── services/                    # Backend microservices
-│   ├── auth-service/           # Authentication and user management
-│   ├── meal-planner-service/   # AI meal plan generation
-│   └── nutrition-ai-service/   # AI coach and macro analysis
-├── db/                         # Database schemas and migrations
-├── k8s/                        # Kubernetes manifests
-├── helm/                       # Helm charts
-├── jenkins/                    # CI/CD pipeline definitions
-└── docs/                       # Documentation and diagrams
-```
+├── frontend/                 # React Client
+│   ├── src/
+│   │   ├── components/       # Reusable UI Components
+│   │   ├── pages/            # Core Views (Dashboard, Planner, Coach)
+│   │   ├── context/          # Global State (Auth)
+│   │   └── services/         # API Integration Layer
+│   └── vite.config.js        # Build Configuration
+│
+├── services/
+│   ├── auth-service/         # Service A: Authentication & Users
+│   │   ├── main.py           # Entry Point
+│   │   ├── models.py         # SQLAlchemy Models
+│   │   └── auth.py           # Security Logic
+│   │
+│   └── nutrition-ai-service/ # Service B: AI & Logic
+│       ├── main.py           # Entry Point
+│       ├── ai_coach.py       # LLM Integration
+│       └── meal_planner.py   # Generation Logic
+🚀 Installation & Setup
+Prerequisites
+Node.js (v18+)
 
-## Quick Start
+Python (v3.10+)
 
-### Prerequisites
-- Docker & Docker Compose
-- Kubernetes (Minikube)
-- kubectl
-- Helm 3
-- Python 3.11+
-- Node.js 18+
+PostgreSQL (Local installation or Cloud)
 
-### Local Development with Docker Compose
-```bash
-# Set up environment variables
-cp .env.example .env
+Google Gemini API Key
 
-# Start all services
-docker-compose up -d
+1. Database Configuration
+Ensure PostgreSQL is running.
 
-# Access frontend
-open http://localhost:3000
-```
+Create a database named macromind.
 
-### Kubernetes Deployment
-```bash
-# Start Minikube
-minikube start --cpus=4 --memory=8192
+2. Backend Setup
+Auth Service:
 
-# Deploy with Helm
-helm install macromind ./helm/macromind -n macromind --create-namespace
+Bash
 
-# Access application
-minikube service frontend -n macromind
-```
+cd services/auth-service
+# Configure .env with DATABASE_URL
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+Nutrition AI Service:
 
-## Services
+Bash
 
-### Auth Service (Port 8000)
-- User registration and authentication
-- JWT token management
-- User profile and goals management
+cd services/nutrition-ai-service
+# Configure .env with GEMINI_API_KEY
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8001
+3. Frontend Setup
+Bash
 
-### Meal Planner Service (Port 8001)
-- AI-powered weekly meal plan generation
-- Meal swapping and customization
-- Macro calculation
+cd frontend
+npm install
+npm run dev
+Application runs on http://localhost:5174
 
-### Nutrition AI Service (Port 8002)
-- Real-time AI nutrition coach
-- Recipe macro analysis
-- Personalized recommendations
+🛡 License
+This project is licensed under the MIT License.
 
-## Documentation
-
-See [docs/](./docs/) for detailed documentation:
-- [Architecture](./docs/architecture.md)
-- [API Documentation](./docs/api.md)
-- [Deployment Guide](./docs/deployment.md)
-- [Development Setup](./docs/development.md)
-
-## Environment Variables
-
-Required environment variables (see `.env.example`):
-- `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET_KEY` - Secret for JWT token signing
-- `OPENAI_API_KEY` - OpenAI API key
-
-## License
-
-Proprietary - Portfolio Project
-
-## Contact
-
-Built for demonstration of full-stack development and DevOps practices.
-
+Developed by Omar Almoumen
